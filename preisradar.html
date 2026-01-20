@@ -65,13 +65,24 @@
   }
   .brand{ display:flex; gap:12px; align-items:center; }
 
-  /* Logo-„Button“ in Blau+Gelb */
-  .logo{
+  /* Logo: aus GitHub (fdb_logo.svg) + Link */
+  .logoLink{
     width:46px; height:46px; border-radius:16px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
     background:
       radial-gradient(circle at 28% 26%, var(--yellow) 0 18%, transparent 19%),
       linear-gradient(135deg, var(--blue) 0%, var(--blue2) 100%);
     box-shadow: var(--shadow);
+    overflow:hidden;
+    text-decoration:none;
+  }
+  .logoImg{
+    width:34px;
+    height:34px;
+    display:block;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,.14));
   }
 
   h1{ margin:0; font-size:20px; letter-spacing:.2px; color:var(--blue); }
@@ -266,7 +277,11 @@
   <div class="wrap">
     <header>
       <div class="brand">
-        <div class="logo" aria-hidden="true"></div>
+        <!-- Logo aus Repo + Link (relative Pfad: fdb_logo.svg liegt im Repo Root) -->
+        <a class="logoLink" href="fdb_logo.svg" target="_blank" rel="noopener" title="FDB Logo öffnen">
+          <img class="logoImg" src="fdb_logo.svg" alt="Freunde der Berge Logo">
+        </a>
+
         <div>
          <h1>Freunde der Berge<br><span style="font-weight:800;color:#0b1b2a">Skiticket Preisfinder</span></h1>
 		 <div class="sub">Günstigster Tagespreis je Bergbahn im Zeitraum + Gesamtminimum</div>
@@ -334,7 +349,7 @@
               <div class="small">Bergbahn</div>
               <div style="font-weight:800;margin-top:2px" id="overallResort">—</div>
               <div style="margin-top:8px">
-                <a class="link" id="overallLink" href="#" target="_blank" rel="noopener" style="display:none">Shop öffnen →</a>
+                <a class="link" id="overallLink" href="#" target="_blank" rel="noopener" style="display:none">Zum Tag →</a>
               </div>
             </div>
           </div>
@@ -433,6 +448,26 @@
     $("to").value = to;
   }
 
+  // ✅ Deep-Link in Shop mit vorausgewähltem Tag
+  function buildShopDeepLink(shopUrl, dateISO) {
+    // Winter (UTC+1): 00:00 lokal => 23:00Z Vortag
+    const base = new Date(dateISO + "T00:00:00.000Z");
+    const from = new Date(base.getTime() - 60 * 60 * 1000); // 23:00Z previous day
+    const to = new Date(base.getTime() + (23 * 60 * 60 * 1000) - 1); // 22:59:59.999Z
+
+    const formState = {
+      attributes: { duration: "1d" },
+      allocation: {
+        kind: "persontype",
+        values: [{ kind: "anonymous", personType: "adult", quantity: 1 }]
+      },
+      validity: { from: from.toISOString(), to: to.toISOString() }
+    };
+
+    const qs = "formState=" + encodeURIComponent(JSON.stringify(formState));
+    return shopUrl.replace(/\?+.*/, "") + "?" + qs;
+  }
+
   function renderTable(perResort) {
     const rows = RESORTS.map(({ key, name }) => {
       const item = perResort.find(x => x.resortKey === key);
@@ -446,8 +481,12 @@
         </tr>`;
       }
 
-      const link = item.shopUrl
-        ? `<a class="link" href="${item.shopUrl}" target="_blank" rel="noopener">Shop</a>`
+      const deepLink = (item.shopUrl && item.best?.date)
+        ? buildShopDeepLink(item.shopUrl, item.best.date)
+        : null;
+
+      const link = deepLink
+        ? `<a class="link" href="${deepLink}" target="_blank" rel="noopener">Zum Tag</a>`
         : "—";
 
       return `<tr>
@@ -477,8 +516,8 @@
     $("overallResort").textContent = resortName;
     $("overallMeta").textContent = `am ${overall.date} • günstigster Preis im Zeitraum`;
 
-    if (overall.shopUrl) {
-      $("overallLink").href = overall.shopUrl;
+    if (overall.shopUrl && overall.date) {
+      $("overallLink").href = buildShopDeepLink(overall.shopUrl, overall.date);
       $("overallLink").style.display = "inline-block";
     } else {
       $("overallLink").style.display = "none";
