@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Skiticket Preisfinder</title>
+  <style>
+  :root{
+    /* Freunde der Berge – Anmutung */
+    --blue:#0a66a3;         /* Hauptblau */
+    --blue2:#0b7bbf;        /* Akzentblau */
+    --lightblue:#cfe9ff;    /* Hellblau-Fläche */
+    --yellow:#ffe37a;       /* Sujet-Gelb */
+    --text:#0b1b2a;
+    --muted:#4b6277;
+    --line: rgba(10,102,163,.18);
+    --bg:#f4f7fb;
+    --shadow: 0 16px 36px rgba(5, 20, 40, .10);
+    --radius: 18px;
+  }
+
+  *{ box-sizing:border-box }
+  body{
+    margin:0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    color:var(--text);
+    background: var(--bg);
+    min-height:100vh;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  /* Sujet-Feeling: gelbe + hellblaue „Schnittflächen“ */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background:
+      /* links unten gelb */
+      linear-gradient(135deg, transparent 0 58%, rgba(255,227,122,.55) 58% 100%),
+      /* rechts unten hellblau */
+      linear-gradient(220deg, transparent 0 62%, rgba(207,233,255,.85) 62% 100%);
+    opacity:1;
+    z-index:-2;
+  }
+
+  body::after{
+    content:"";
+    position:fixed;
+    inset:-40px;
+    pointer-events:none;
+    background:
+      radial-gradient(700px 450px at 18% 8%, rgba(10,102,163,.12), transparent 60%),
+      radial-gradient(700px 450px at 84% 10%, rgba(255,227,122,.22), transparent 60%);
+    z-index:-1;
+  }
+
+  a{ color: var(--blue); }
+  .wrap{ max-width:1024px; margin:0 auto; padding:28px 16px 64px; }
+
+  header{
+    display:flex; gap:14px; align-items:flex-start; justify-content:space-between;
+    margin-bottom:18px;
+  }
+  .brand{ display:flex; gap:12px; align-items:center; }
+
+  /* Logo-„Button“ in Blau+Gelb */
+  .logo{
+    width:46px; height:46px; border-radius:16px;
+    background:
+      radial-gradient(circle at 28% 26%, var(--yellow) 0 18%, transparent 19%),
+      linear-gradient(135deg, var(--blue) 0%, var(--blue2) 100%);
+    box-shadow: var(--shadow);
+  }
+
+  h1{ margin:0; font-size:20px; letter-spacing:.2px; color:var(--blue); }
+  .sub{ margin:2px 0 0; color:var(--muted); font-size:13px; }
+
+  .pill{
+    display:inline-flex; gap:8px; align-items:center;
+    padding:9px 12px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background: rgba(255,255,255,.75);
+    box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    color:var(--muted);
+    font-size:12px;
+    backdrop-filter: blur(6px);
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: 1.2fr .8fr;
+    gap:16px;
+    margin-top:14px;
+  }
+  @media (max-width: 880px){
+    .grid{ grid-template-columns:1fr; }
+    header{ flex-direction:column; }
+  }
+
+  .card{
+    background: rgba(255,255,255,.85);
+    border:1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow:hidden;
+    backdrop-filter: blur(8px);
+  }
+
+  .card .hd{
+    padding:16px 16px 12px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.70));
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+
+  .card .bd{ padding:16px; }
+
+  .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; }
+
+  label{ display:block; font-size:12px; color:var(--muted); margin:0 0 6px; }
+
+  input[type="date"]{
+    appearance:none;
+    background: rgba(255,255,255,.92);
+    border:1px solid rgba(10,102,163,.28);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius: 12px;
+    font-size:14px;
+    min-width: 170px;
+    outline:none;
+  }
+  input[type="date"]:focus{
+    border-color: rgba(10,102,163,.55);
+    box-shadow: 0 0 0 3px rgba(10,102,163,.15);
+  }
+
+  /* Primary Button – Blau mit gelbem Highlight */
+  .btn{
+    background:
+      radial-gradient(circle at 22% 28%, rgba(255,227,122,.95) 0 18%, transparent 19%),
+      linear-gradient(135deg, var(--blue) 0%, var(--blue2) 100%);
+    border:none;
+    color:white;
+    padding:11px 14px;
+    border-radius: 13px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow: 0 14px 28px rgba(10,102,163,.22);
+    transition: transform .08s ease, filter .15s ease;
+    display:inline-flex; gap:10px; align-items:center;
+  }
+  .btn:hover{ filter: brightness(1.02); }
+  .btn:active{ transform: translateY(1px); }
+  .btn[disabled]{ opacity:.55; cursor:not-allowed; transform:none; }
+
+  .ghost{
+    background: rgba(255,255,255,.92);
+    border:1px solid rgba(10,102,163,.25);
+    color:var(--blue);
+    padding:10px 12px;
+    border-radius: 13px;
+    cursor:pointer;
+    font-weight:700;
+  }
+
+  .muted{ color:var(--muted); }
+  .hint{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.5; }
+
+  .overall{
+    padding:16px;
+    background:
+      linear-gradient(135deg, rgba(255,227,122,.35), rgba(207,233,255,.55));
+    border:1px solid rgba(10,102,163,.20);
+    border-radius: 16px;
+    display:flex; gap:14px; align-items:flex-start; justify-content:space-between;
+  }
+  .overall h2{ margin:0; font-size:14px; color:var(--muted); font-weight:700; }
+  .priceBig{ font-size:28px; font-weight:900; letter-spacing:.2px; margin:2px 0 0; color:var(--blue); }
+  .meta{ font-size:12px; color:var(--muted); margin-top:6px; }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 10px;
+    border-radius:999px;
+    background: rgba(255,255,255,.92);
+    border:1px solid rgba(10,102,163,.20);
+    font-size:12px;
+    color:var(--text);
+  }
+  .dot{ width:8px; height:8px; border-radius:50%; }
+  .dot.good{ background: #1fbf7a; }
+  .dot.warn{ background: #f2b23f; }
+  .dot.bad{ background: #e54848; }
+
+  table{
+    width:100%;
+    border-collapse: collapse;
+    border-radius: 14px;
+    border:1px solid rgba(10,102,163,.18);
+    background: rgba(255,255,255,.92);
+    overflow:hidden;
+  }
+  th,td{
+    text-align:left;
+    padding:12px 12px;
+    border-bottom:1px solid rgba(10,102,163,.14);
+    vertical-align:middle;
+    font-size:14px;
+  }
+  th{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:800;
+    background: rgba(207,233,255,.55);
+  }
+  tr:last-child td{ border-bottom:none; }
+  .right{ text-align:right; }
+  .small{ font-size:12px; color:var(--muted); }
+
+  .link{
+    color: var(--blue);
+    text-decoration:none;
+    font-weight:800;
+  }
+  .link:hover{ text-decoration:underline; }
+
+  .toast{
+    margin-top:12px;
+    padding:12px 12px;
+    border-radius: 14px;
+    border:1px solid rgba(229,72,72,.25);
+    background: rgba(229,72,72,.10);
+    color: #8a0f0f;
+    display:none;
+    font-size:13px;
+    line-height:1.45;
+  }
+
+  .spinner{
+    width:18px;height:18px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.35);
+    border-top-color: rgba(255,255,255,.95);
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+
+  footer{ margin-top:18px; color:var(--muted); font-size:12px; }
+
+  code.inline{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    background: rgba(207,233,255,.55);
+    border:1px solid rgba(10,102,163,.18);
+    padding:2px 6px;
+    border-radius: 8px;
+    color: var(--text);
+  }
+</style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+         <h1>Freunde der Berge<br><span style="font-weight:800;color:#0b1b2a">Skiticket Preisfinder</span></h1>
+		 <div class="sub">Günstigster Tagespreis je Bergbahn im Zeitraum + Gesamtminimum</div>
+        </div>
+      </div>
+      <div class="pill" id="apiPill">API: <span id="apiBaseText" class="muted"></span></div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div class="hd">
+          <div>
+            <div style="font-weight:750">Zeitraum auswählen</div>
+            <div class="small">Format: von/bis (inklusive)</div>
+          </div>
+          <button class="ghost" id="btnToday">Zeitraum: nächste 14 Tage</button>
+        </div>
+
+        <div class="bd">
+          <div class="row">
+            <div>
+              <label for="from">Von</label>
+              <input id="from" type="date" />
+            </div>
+            <div>
+              <label for="to">Bis</label>
+              <input id="to" type="date" />
+            </div>
+            <div style="flex:1"></div>
+            <button class="btn" id="btnRun">
+              <span class="spinner" id="spin" style="display:none"></span>
+              <span id="btnText">Preise suchen</span>
+            </button>
+          </div>
+
+          <div class="hint">
+            Diese Seite fragt deinen Cloudflare Worker ab (der wiederum die Tagespreise aus den Shops zieht).
+            Wenn du viele Tage auswählst, dauert es etwas länger — dank Caching wird’s danach schneller.
+          </div>
+
+          <div class="toast" id="toast"></div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="hd">
+          <div>
+            <div style="font-weight:750">Gesamtminimum</div>
+            <div class="small">günstigster Preis über alle Bergbahnen</div>
+          </div>
+          <div class="badge" id="statusBadge">
+            <span class="dot warn"></span>
+            <span id="statusText">Warten…</span>
+          </div>
+        </div>
+
+        <div class="bd">
+          <div class="overall" id="overallBox">
+            <div>
+              <h2>Ergebnis</h2>
+              <div class="priceBig" id="overallPrice">—</div>
+              <div class="meta" id="overallMeta">Bitte Zeitraum wählen und „Preise suchen“ klicken.</div>
+            </div>
+            <div style="text-align:right">
+              <div class="small">Bergbahn</div>
+              <div style="font-weight:800;margin-top:2px" id="overallResort">—</div>
+              <div style="margin-top:8px">
+                <a class="link" id="overallLink" href="#" target="_blank" rel="noopener" style="display:none">Shop öffnen →</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <section class="card" style="margin-top:16px">
+      <div class="hd">
+        <div>
+          <div style="font-weight:750">Minimum pro Bergbahn</div>
+          <div class="small">Tageskarte (Erwachsen) — günstigster Tag im gewählten Zeitraum</div>
+        </div>
+        <div class="small" id="lastUpdated"></div>
+      </div>
+      <div class="bd">
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Bergbahn</th>
+                <th class="right">Min. Preis</th>
+                <th>Datum</th>
+                <th>Quelle</th>
+              </tr>
+            </thead>
+            <tbody id="tbody">
+              <tr><td colspan="4" class="muted">Noch keine Daten. Zeitraum wählen und starten.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Tipp: Wenn du das Frontend auf GitHub Pages hostest, setze oben <code class="inline">API_BASE</code> auf deine Worker-URL.
+    </footer>
+  </div>
+
+<script>
+  // HIER EINTRAGEN:
+  const API_BASE = "https://preisradar.marketing-0af.workers.dev";
+
+  // Reihenfolge + Labels
+  const RESORTS = [
+    { key: "hochkar", name: "Hochkar" },
+    { key: "oetscher", name: "Ötscher" },
+    { key: "annaberg", name: "Annaberg" },
+    { key: "erlebnisalm", name: "Erlebnisalm (Mönichkirchen)" }
+  ];
+
+  const $ = (id) => document.getElementById(id);
+
+  function setBadge(kind, text) {
+    const dot = $("statusBadge").querySelector(".dot");
+    dot.className = "dot " + kind;
+    $("statusText").textContent = text;
+  }
+
+  function showToast(msg) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.style.display = "block";
+  }
+  function hideToast() {
+    $("toast").style.display = "none";
+    $("toast").textContent = "";
+  }
+
+  function euroFromCents(cents) {
+    if (typeof cents !== "number" || Number.isNaN(cents)) return "—";
+    return (cents / 100).toLocaleString("de-AT", { style: "currency", currency: "EUR" });
+  }
+
+  function todayISO() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function addDaysISO(iso, days) {
+    const d = new Date(iso + "T00:00:00");
+    d.setDate(d.getDate() + days);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function setDefaultDates() {
+    const from = todayISO();
+    const to = addDaysISO(from, 13);
+    $("from").value = from;
+    $("to").value = to;
+  }
+
+  function renderTable(perResort) {
+    const rows = RESORTS.map(({ key, name }) => {
+      const item = perResort.find(x => x.resortKey === key);
+
+      if (!item || !item.best) {
+        return `<tr>
+          <td style="font-weight:650">${name}</td>
+          <td class="right muted">—</td>
+          <td class="muted">—</td>
+          <td class="muted">keine Daten</td>
+        </tr>`;
+      }
+
+      const link = item.shopUrl
+        ? `<a class="link" href="${item.shopUrl}" target="_blank" rel="noopener">Shop</a>`
+        : "—";
+
+      return `<tr>
+        <td style="font-weight:650">${name}</td>
+        <td class="right" style="font-weight:800">${euroFromCents(item.best.priceCents)}</td>
+        <td>${item.best.date}</td>
+        <td>${link}</td>
+      </tr>`;
+    }).join("");
+
+    $("tbody").innerHTML = rows || `<tr><td colspan="4" class="muted">Keine Daten</td></tr>`;
+  }
+
+  function renderOverall(overall) {
+    if (!overall) {
+      $("overallPrice").textContent = "—";
+      $("overallResort").textContent = "—";
+      $("overallMeta").textContent = "Keine Daten im Zeitraum gefunden.";
+      $("overallLink").style.display = "none";
+      setBadge("bad", "Keine Daten");
+      return;
+    }
+
+    const resortName = (RESORTS.find(r => r.key === overall.resortKey)?.name) || overall.resortKey;
+
+    $("overallPrice").textContent = euroFromCents(overall.priceCents);
+    $("overallResort").textContent = resortName;
+    $("overallMeta").textContent = `am ${overall.date} • günstigster Preis im Zeitraum`;
+
+    if (overall.shopUrl) {
+      $("overallLink").href = overall.shopUrl;
+      $("overallLink").style.display = "inline-block";
+    } else {
+      $("overallLink").style.display = "none";
+    }
+
+    setBadge("good", "Berechnet");
+  }
+
+  async function fetchMinResort(resortKey, from, to) {
+    const url = `${API_BASE.replace(/\/$/, "")}/min-resort?resort=${encodeURIComponent(resortKey)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+    const r = await fetch(url);
+    if (!r.ok) {
+      const body = await r.text().catch(() => "");
+      throw new Error(`API Fehler (${resortKey}): ${r.status}. ${body ? body.slice(0, 200) : ""}`);
+    }
+    return r.json();
+  }
+
+  async function run() {
+    hideToast();
+
+    const from = $("from").value;
+    const to = $("to").value;
+
+    if (!from || !to) {
+      showToast("Bitte „Von“ und „Bis“ auswählen.");
+      setBadge("bad", "Fehler");
+      return;
+    }
+    if (from > to) {
+      showToast("„Von“ darf nicht nach „Bis“ liegen.");
+      setBadge("bad", "Fehler");
+      return;
+    }
+    if (!API_BASE) {
+      showToast("Bitte API_BASE auf deine Worker-URL setzen.");
+      setBadge("bad", "API fehlt");
+      return;
+    }
+
+    const btn = $("btnRun");
+    const spin = $("spin");
+    const txt = $("btnText");
+
+    btn.disabled = true;
+    spin.style.display = "inline-block";
+    txt.textContent = "Suche…";
+    setBadge("warn", "Lädt…");
+
+    try {
+      // 4 Resorts parallel abfragen
+      const responses = await Promise.all(
+        RESORTS.map(r => fetchMinResort(r.key, from, to))
+      );
+
+      // Normalisieren für UI
+      const perResort = responses.map(r => ({
+        resortKey: r.resort,
+        name: r.name,
+        shopUrl: r.shopUrl,
+        best: r.best ? { date: r.best.date, priceCents: r.best.priceCents } : null
+      }));
+
+      renderTable(perResort);
+
+      // Gesamtminimum berechnen
+      const candidates = perResort.filter(x => x.best && typeof x.best.priceCents === "number");
+      const overall = candidates.reduce((min, x) => {
+        if (!min) return { resortKey: x.resortKey, date: x.best.date, priceCents: x.best.priceCents, shopUrl: x.shopUrl };
+        return (x.best.priceCents < min.priceCents)
+          ? { resortKey: x.resortKey, date: x.best.date, priceCents: x.best.priceCents, shopUrl: x.shopUrl }
+          : min;
+      }, null);
+
+      renderOverall(overall);
+
+      const now = new Date();
+      $("lastUpdated").textContent = `Aktualisiert: ${now.toLocaleString("de-AT")}`;
+    } catch (e) {
+      console.error(e);
+      showToast(e.message || "Unbekannter Fehler.");
+      setBadge("bad", "Fehler");
+    } finally {
+      btn.disabled = false;
+      spin.style.display = "none";
+      txt.textContent = "Preise suchen";
+    }
+  }
+
+  // init
+  $("apiBaseText").textContent = API_BASE;
+  $("btnRun").addEventListener("click", run);
+  $("btnToday").addEventListener("click", () => setDefaultDates());
+  setDefaultDates();
+</script>
+
+</body>
+</html>
