@@ -361,7 +361,6 @@
   </div>
 
 <script>
-  // ✅ deine Worker-URL
   const API_BASE = "https://preisradar.marketing-0af.workers.dev";
 
   const RESORTS = [
@@ -418,18 +417,11 @@
     $("to").value = to;
   }
 
-  // ✅ Datums-Liste als "YYYY-MM-DD, YYYY-MM-DD, ..."
-  function formatDatesInline(dates) {
-    if (!Array.isArray(dates) || dates.length === 0) return "—";
-    const sorted = [...dates].sort();
-    return sorted.join(", ");
-  }
-
-  // ✅ Deep-Link in Shop mit vorausgewähltem Tag
+  // Deep-Link in Shop mit vorausgewähltem Tag
   function buildShopDeepLink(shopUrl, dateISO) {
     const base = new Date(dateISO + "T00:00:00.000Z");
-    const from = new Date(base.getTime() - 60 * 60 * 1000);          // 23:00Z Vortag
-    const to   = new Date(base.getTime() + (23 * 60 * 60 * 1000) - 1);// 22:59:59.999Z
+    const from = new Date(base.getTime() - 60 * 60 * 1000);
+    const to = new Date(base.getTime() + (23 * 60 * 60 * 1000) - 1);
 
     const formState = {
       attributes: { duration: "1d" },
@@ -442,6 +434,21 @@
 
     const qs = "formState=" + encodeURIComponent(JSON.stringify(formState));
     return shopUrl.replace(/\?+.*/, "") + "?" + qs;
+  }
+
+  // "dates" hübsch als Komma-Liste
+  function formatDates(best) {
+    if (!best) return "—";
+    if (Array.isArray(best.dates) && best.dates.length) return best.dates.join(", ");
+    if (best.date) return best.date; // fallback
+    return "—";
+  }
+
+  // erster Tag für Deep-Link
+  function firstBestDate(best) {
+    if (!best) return null;
+    if (Array.isArray(best.dates) && best.dates.length) return best.dates[0];
+    return best.date || null;
   }
 
   function renderTable(perResort) {
@@ -457,12 +464,8 @@
         </tr>`;
       }
 
-      const dates = item.best.dates || (item.best.date ? [item.best.date] : []);
-      const firstDate = dates[0];
-
-      const deepLink = (item.shopUrl && firstDate)
-        ? buildShopDeepLink(item.shopUrl, firstDate)
-        : null;
+      const d0 = firstBestDate(item.best);
+      const deepLink = (item.shopUrl && d0) ? buildShopDeepLink(item.shopUrl, d0) : null;
 
       const link = deepLink
         ? `<a class="link" href="${deepLink}" target="_blank" rel="noopener">Zum Tag</a>`
@@ -471,7 +474,7 @@
       return `<tr>
         <td style="font-weight:650">${name}</td>
         <td class="right" style="font-weight:800">${euroFromCents(item.best.priceCents)}</td>
-        <td>${formatDatesInline(dates)}</td>
+        <td>${formatDates(item.best)}</td>
         <td>${link}</td>
       </tr>`;
     }).join("");
@@ -491,15 +494,14 @@
 
     const resortName = (RESORTS.find(r => r.key === overall.resortKey)?.name) || overall.resortKey;
 
-    const dates = overall.dates || (overall.date ? [overall.date] : []);
-    const firstDate = dates[0];
-
     $("overallPrice").textContent = euroFromCents(overall.priceCents);
     $("overallResort").textContent = resortName;
-    $("overallMeta").textContent = `am ${formatDatesInline(dates)} • günstigster Preis im Zeitraum`;
+    $("overallMeta").textContent = `am ${formatDates(overall)} • günstigster Preis im Zeitraum`;
 
-    if (overall.shopUrl && firstDate) {
-      $("overallLink").href = buildShopDeepLink(overall.shopUrl, firstDate);
+    const d0 = firstBestDate(overall);
+
+    if (overall.shopUrl && d0) {
+      $("overallLink").href = buildShopDeepLink(overall.shopUrl, d0);
       $("overallLink").style.display = "inline-block";
     } else {
       $("overallLink").style.display = "none";
@@ -546,7 +548,8 @@
         shopUrl: r.shopUrl,
         best: r.best ? {
           priceCents: r.best.priceCents,
-          dates: Array.isArray(r.best.dates) ? r.best.dates : (r.best.date ? [r.best.date] : [])
+          date: r.best.date ?? null,
+          dates: Array.isArray(r.best.dates) ? r.best.dates : null
         } : null
       }));
 
@@ -554,9 +557,10 @@
 
       const candidates = perResort.filter(x => x.best && typeof x.best.priceCents === "number");
       const overall = candidates.reduce((min, x) => {
-        const current = { resortKey: x.resortKey, dates: x.best.dates, priceCents: x.best.priceCents, shopUrl: x.shopUrl };
-        if (!min) return current;
-        return (x.best.priceCents < min.priceCents) ? current : min;
+        if (!min) return { resortKey: x.resortKey, ...x.best, shopUrl: x.shopUrl };
+        return (x.best.priceCents < min.priceCents)
+          ? { resortKey: x.resortKey, ...x.best, shopUrl: x.shopUrl }
+          : min;
       }, null);
 
       renderOverall(overall);
